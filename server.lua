@@ -96,18 +96,30 @@ function saveClip(Source, Webhook)
     end)
 
     local Result = Citizen.Await(Response)
-    return Result.url, Result.error, Result.seconds
+    return Result.url, Result.error, Result.seconds, Result.discord
 end
 
-RegisterNetEvent("mrl-replay:saved", function(Url, Error, Id, Seconds)
+RegisterNetEvent("mrl-replay:saved", function(Url, Error, Id, Seconds, Discord)
     local Source = source
 
     if type(Id) ~= "string" or Id == "" then return end
 
+    local Metadata
+    if type(Discord) == "table" then
+        Metadata = {}
+        for _, Key in ipairs({ "messageId", "attachmentId", "webhookId" }) do
+            local Value = Discord[Key]
+            if type(Value) == "string" and #Value <= 32 and Value:match("^%d+$") then
+                Metadata[Key] = Value
+            end
+        end
+    end
+
     resolveRequest(Source, Id, {
         url = Url,
         error = Error,
-        seconds = tonumber(Seconds)
+        seconds = tonumber(Seconds),
+        discord = Metadata
     })
 end)
 

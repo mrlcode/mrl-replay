@@ -77,7 +77,7 @@ local ReplayWebhook = GetConvar('replay_webhook', '')
 
 local function solicitarReplay(playerSource)
     CreateThread(function()
-        local url, err, seconds = exports['mrl-replay']:saveClip(
+        local url, err, seconds, discord = exports['mrl-replay']:saveClip(
             playerSource,
             ReplayWebhook
         )
@@ -110,7 +110,7 @@ dependency 'mrl-replay'
 ### Assinatura do export
 
 ```lua
-local url, err, seconds = exports['mrl-replay']:saveClip(playerSource, webhook)
+local url, err, seconds, discord = exports['mrl-replay']:saveClip(playerSource, webhook)
 ```
 
 | Campo | Tipo | Descrição |
@@ -120,8 +120,30 @@ local url, err, seconds = exports['mrl-replay']:saveClip(playerSource, webhook)
 | `url` | string ou nil | URL do anexo retornada pelo Discord em caso de sucesso. |
 | `err` | string ou nil | Descrição da falha. |
 | `seconds` | number ou nil | Duração aproximada do vídeo enviado. |
+| `discord` | table ou nil | Metadados do envio: `messageId`, `attachmentId` e `webhookId`, como strings quando disponíveis. |
 
 Use o export como ponto de entrada da integração: ele registra a solicitação e correlaciona a resposta do client.
+
+### Metadados e renovação da URL do vídeo
+
+O quarto retorno contém os IDs da mensagem, do anexo e da webhook. Os três primeiros retornos permanecem compatíveis com as integrações existentes. Preserve os IDs como strings para evitar perda de precisão.
+
+```lua
+if discord then
+    -- Persista junto da URL no seu banco de dados.
+    print(discord.messageId, discord.attachmentId, discord.webhookId)
+end
+```
+
+As URLs de anexos do Discord são assinadas e podem expirar. Com os IDs retornados e o token da webhook original, sua integração pode consultar a mensagem novamente e obter uma URL atualizada, sem reenviar o vídeo:
+
+1. Guarde os metadados junto do registro do replay e mantenha o token da webhook no servidor.
+2. Consulte `GET https://discord.com/api/v10/webhooks/{webhookId}/{webhookToken}/messages/{messageId}`.
+3. Localize em `attachments` o anexo cujo `id` corresponde a `attachmentId` e use sua nova propriedade `url`.
+
+Os IDs sozinhos não autorizam essa consulta. A mensagem e o anexo precisam continuar disponíveis e a credencial da webhook precisa ser válida. A renovação deve ser implementada na sua integração; o MRL Replay retorna os metadados, sem renovar ou persistir URLs automaticamente. Os dados recebidos do client não constituem comprovação de autenticidade.
+
+Referências: [URLs assinadas de anexos](https://docs.discord.com/developers/reference#signed-attachment-cdn-urls) e [Get Webhook Message](https://docs.discord.com/developers/resources/webhook#get-webhook-message).
 
 ## Exemplo de integração com EQPG ANTI CHEAT
 
@@ -146,7 +168,7 @@ AddEventHandler('EQPG:suspeitos', function(playerSource, reason, token)
     local webhook = Webhooks[reason:lower()] or Webhooks['default']
 
     CreateThread(function()
-        local url, err, seconds = exports['mrl-replay']:saveClip(
+        local url, err, seconds, discord = exports['mrl-replay']:saveClip(
             playerSource,
             webhook
         )
@@ -179,7 +201,7 @@ replaysave [source] [webhook]
 
 Substitua os argumentos pela source e pela URL completa da webhook. O comando só atende chamadas do console do servidor e imprime a URL ou o erro ao terminar.
 
-Aguarde cerca de 10 segundos após a inicialização do resource no client para o primeiro teste. Se o buffer ainda estiver acumulando, a NUI aguarda a gravação ficar disponível dentro do prazo da solicitação.
+A solicitação usa imediatamente o trecho disponível, sem esperar acumular 10 segundos. Logo após a inicialização ou em pedidos próximos, o clipe pode ser curto. Se não houver uma gravação ativa ou o vídeo estiver vazio, a solicitação retorna um erro.
 
 ## Configuração da gravação
 
@@ -200,9 +222,11 @@ const recordingConfig = {
 | `width` / `height` | Resolução de captura. |
 | `fps` | Taxa solicitada ao stream do canvas. |
 | `bitrate` | Bitrate solicitado ao encoder, em bits por segundo. |
-| `clipSeconds` | Janela mínima de gravação usada para selecionar um clipe. |
+| `clipSeconds` | Janela de referência para sobrepor e renovar as gravações; não define uma duração mínima. |
 
-A implementação mantém gravações sobrepostas. Com `clipSeconds: 10`, o clipe normalmente contém aproximadamente **10 a 20 segundos**, dependendo do momento da solicitação. Não existe recorte exato dos últimos 10 segundos. Pedidos próximos podem precisar aguardar a recomposição do buffer.
+A implementação verifica o buffer a cada segundo e mantém gravações sobrepostas. Com `clipSeconds: 10`, a segunda gravação começa por volta dos 10 segundos e cada gravação é renovada ao atingir aproximadamente 20 segundos.
+
+Ao solicitar um replay, o sistema finaliza imediatamente a gravação ativa mais antiga. Com o buffer formado e sem solicitações frequentes, o vídeo costuma conter aproximadamente **10 a 20 segundos**. Na inicialização ou após pedidos próximos, ele pode ter **menos de 10 segundos**, sem aguardar cenas futuras para atingir uma duração mínima. Não existe recorte exato dos últimos 10 segundos.
 
 Aumentar resolução, FPS, bitrate ou duração pode aumentar o uso de CPU/GPU, memória, tamanho do arquivo e tempo de envio. Reinicie o resource após alterar a configuração.
 
@@ -223,7 +247,8 @@ Ao alterar esses valores, mantenha margem para o resultado chegar ao servidor. O
 | `Discord HTTP ...` | Leia o detalhe retornado: a webhook, o tamanho do arquivo ou o limite de requisições podem impedir o envio. |
 | Timeout da NUI ou do servidor | Verifique erros no F8/NUI, conexão do client e tempo necessário para upload. |
 | Falha ao carregar o resource | Confira o nome da pasta `mrl-replay`, os arquivos do resource, o `fxmanifest.lua` e os erros no console. |
-| Primeiro clipe demora | O buffer precisa acumular vídeo antes da captura. |
+| Clipe com menos de 10 segundos | Pode ocorrer após a inicialização ou em pedidos próximos; o sistema envia o trecho disponível sem esperar completar a janela. |
+| `buffer de replay indisponivel` ou `video vazio` | Não havia gravação ativa ou dados suficientes para gerar o arquivo; confira a inicialização e os erros da NUI. |
 
 ## Limites e uso em produção
 

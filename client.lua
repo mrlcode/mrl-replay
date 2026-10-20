@@ -2,11 +2,11 @@ local PendingRequests = {}
 local UploadTimeout = 30000
 local ResponseTimeout = 33000
 
-local function finishRequest(Id, Url, Error, Seconds)
+local function finishRequest(Id, Url, Error, Seconds, Discord)
     if not PendingRequests[Id] then return end
     PendingRequests[Id] = nil
 
-    TriggerServerEvent("mrl-replay:saved", Url, Error, Id, Seconds)
+    TriggerServerEvent("mrl-replay:saved", Url, Error, Id, Seconds, Discord)
 end
 
 RegisterNetEvent("mrl-replay:save", function(Webhook, Id)
@@ -47,5 +47,5 @@ RegisterNUICallback("saved", function(Data, Callback)
         Error = "NUI retornou resposta sem URL do video"
     end
 
-    finishRequest(Data.id, Url, Error, Seconds)
+    finishRequest(Data.id, Url, Error, Seconds, Data.discord)
 end)

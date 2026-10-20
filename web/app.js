@@ -5,6 +5,7 @@ let sessions = [];
 let recordingStartedAt = 0;
 let activeUpload;
 let initialization;
+let maintenanceHandle;
 
 const recordingConfig = {
     width: 854,
@@ -65,13 +66,11 @@ function maintainRecorders() {
 }
 
 async function currentClip() {
-    const minimumAge = config.clipSeconds * 1000;
     const session = activeSessions()
-        .filter(item => Date.now() - item.startedAt >= minimumAge)
         .sort((a, b) => a.startedAt - b.startedAt)[0];
 
     if (!session) {
-        throw new Error(`buffer ainda acumulando: aguarde ${config.clipSeconds} segundos`);
+        throw new Error('buffer de replay indisponivel');
     }
 
     const startedAt = session.startedAt;
@@ -87,15 +86,8 @@ async function currentClip() {
 }
 
 async function clipWhenReady(signal) {
-    try {
-        return await currentClip();
-    } catch (error) {
-        if (!String(error.message).startsWith('buffer ainda acumulando')) throw error;
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        if (signal.aborted) throw new DOMException('upload cancelado', 'AbortError');
-        return clipWhenReady(signal);
-    }
+    if (signal.aborted) throw new DOMException('upload cancelado', 'AbortError');
+    return currentClip();
 }
 
 async function nui(name, body) {
@@ -165,13 +157,21 @@ async function uploadClipToWebhook(webhookValue, clip, signal) {
         throw new Error(`Discord retornou resposta inválida: ${responseText.slice(0, 300)}`);
     }
 
-    const url = discordMessage?.attachments?.[0]?.url;
+    const attachment = discordMessage?.attachments?.[0];
+    const url = attachment?.url;
 
     if (!url) {
         throw new Error('Discord não retornou a URL do vídeo');
     }
 
-    return url;
+    return {
+        url,
+        discord: {
+            messageId: String(discordMessage?.id || ''),
+            attachmentId: String(attachment?.id || ''),
+            webhookId: String(discordMessage?.webhook_id || webhook.pathname.match(/\/api\/webhooks\/(\d+)\//)?.[1] || '')
+        }
+    };
 }
 
 async function processUploadRequest(session, request) {
@@ -197,12 +197,13 @@ async function processUploadRequest(session, request) {
         }
 
         const captured = await session.capturePromise;
-        const url = await uploadClipToWebhook(request.webhook, captured.blob, session.controller.signal);
+        const uploaded = await uploadClipToWebhook(request.webhook, captured.blob, session.controller.signal);
 
         await nui('saved', {
             id: request.id,
-            url,
-            seconds: captured.seconds
+            url: uploaded.url,
+            seconds: captured.seconds,
+            discord: uploaded.discord
         });
     } catch (error) {
         const reason = error.name === 'AbortError' ? 'upload cancelado ou expirado' : error.message;
@@ -232,7 +233,10 @@ function ensureRecording() {
         stream = canvas.captureStream(config.fps);
         recordingStartedAt = Date.now();
         startRecorder();
+        maintenanceHandle = setInterval(maintainRecorders, 1000);
     })().catch(error => {
+        if (maintenanceHandle) clearInterval(maintenanceHandle);
+        maintenanceHandle = undefined;
         stream = undefined;
         sessions = [];
         recordingStartedAt = 0;
