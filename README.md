@@ -10,21 +10,21 @@ O fluxo principal usa Lua no servidor e no client, com captura e upload pela NUI
 
 **Gravação normal**
 
-https://github.com/user-attachments/assets/85f1b434-42c3-43a9-b8e4-755bd3ca7a4d
+https://github.com/user-attachments/assets/ab1df390-8356-4fae-b392-d7d169ab6ba9
 
 **Sistema de replay**
 
-https://github.com/user-attachments/assets/9dd46003-7132-4336-a65c-51a37c4c6411
+https://github.com/user-attachments/assets/26424310-bfac-4de4-89b0-2da835c4a575
 
 ### Exemplo 2 — Gravação normal e replay
 
 **Gravação normal**
 
-https://github.com/user-attachments/assets/594f48f2-2bb7-49de-8e33-a987e308f766
+https://github.com/user-attachments/assets/c52376db-616f-4c94-aa65-c0d4dcfe80e9
 
 **Sistema de replay**
 
-https://github.com/user-attachments/assets/b163daa2-fc8d-4adb-ab44-b4f576ecc003
+https://github.com/user-attachments/assets/4d0dd0c3-c94b-4c16-8f0b-35dd5e1960ed
 
 ### Exemplo 3 — Visibilidade de interfaces de cheats internos
 
