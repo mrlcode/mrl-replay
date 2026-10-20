@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/c52376db-616f-4c94-aa65-c0d4dcfe80e9
 
 **Sistema de replay**
 
-https://github.com/user-attachments/assets/4d0dd0c3-c94b-4c16-8f0b-35dd5e1960ed
+https://github.com/user-attachments/assets/115251a8-13a2-4139-b210-b54b0a57822e
 
 ### Exemplo 3 — Visibilidade de interfaces de cheats internos
 
