@@ -32,7 +32,7 @@ Alguns cheats internos também podem ter suas interfaces visíveis no replay qua
 
 **Sistema de replay**
 
-https://github.com/user-attachments/assets/918892af-20ec-43a0-af89-fdb68dcf3122
+https://github.com/user-attachments/assets/42a56532-3656-4c72-9c82-ed46372b79c8
 
 ## Recursos
 
